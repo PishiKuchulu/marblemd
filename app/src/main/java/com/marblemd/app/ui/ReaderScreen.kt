@@ -70,6 +70,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -90,6 +91,7 @@ import com.marblemd.app.library.RecentDocument
 import com.marblemd.app.markdown.MarkdownPlanHeading
 import com.marblemd.app.markdown.MarkdownRenderPlan
 import com.marblemd.app.markdown.searchBlocks
+import com.marblemd.app.markdown.ReadingMatch
 import org.commonmark.node.FencedCodeBlock
 import org.commonmark.node.IndentedCodeBlock
 import com.marblemd.app.model.DirectionMode
@@ -101,6 +103,7 @@ import com.marblemd.app.text.CustomFont
 import com.marblemd.app.update.UpdateStatus
 import com.marblemd.app.update.UpdateUiState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -885,7 +888,13 @@ private fun CodeBlock(code: String, language: String, isLast: Boolean) {
 @Composable
 private fun ReadingSearchSheet(plan: MarkdownRenderPlan, onDismiss: () -> Unit, onSelect: (Int) -> Unit) {
     var query by remember(plan) { mutableStateOf("") }
-    val matches = remember(plan, query) { searchBlocks(plan, query) }
+    val matches by produceState<List<ReadingMatch>>(emptyList(), plan, query) {
+        value = emptyList()
+        if (query.isNotBlank()) {
+            delay(200)
+            value = withContext(Dispatchers.Default) { searchBlocks(plan, query) }
+        }
+    }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
             Text("Search in preview", style = MaterialTheme.typography.titleLarge)
