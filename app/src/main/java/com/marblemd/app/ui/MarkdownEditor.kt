@@ -75,6 +75,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
+import com.marblemd.app.model.DirectionMode
+import com.marblemd.app.markdown.containsRtl
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.marblemd.app.editor.EditorHistory
@@ -96,6 +99,7 @@ import kotlin.math.roundToInt
 @Composable
 internal fun MarkdownEditor(
     markdown: String,
+    directionMode: DirectionMode,
     onMarkdownChange: (String) -> Unit,
     scrollState: ScrollState,
     saveStateLabel: String,
@@ -124,7 +128,17 @@ internal fun MarkdownEditor(
         color = colors.onSurface,
         fontFamily = fontFamily ?: FontFamily.Monospace,
         fontSize = 16.sp,
-        lineHeight = 25.sp
+        lineHeight = 25.sp,
+        textDirection = when (directionMode) {
+            DirectionMode.AUTO -> if (containsRtl(markdown)) TextDirection.ContentOrRtl else TextDirection.ContentOrLtr
+            DirectionMode.RTL -> TextDirection.Rtl
+            DirectionMode.LTR -> TextDirection.Ltr
+        },
+        textAlign = when (directionMode) {
+            DirectionMode.AUTO -> if (containsRtl(markdown)) TextAlign.Right else TextAlign.Left
+            DirectionMode.RTL -> TextAlign.Right
+            DirectionMode.LTR -> TextAlign.Left
+        }
     )
 
     LaunchedEffect(markdown) {
@@ -218,6 +232,8 @@ internal fun MarkdownEditor(
         commit(TextFieldValue(builder.toString(), TextRange(0)))
     }
 
+    LaunchedEffect(findVisible) { if (findVisible) findFocus.requestFocus() }
+
     if (insertSheet) {
         MarkdownInsertSheet(
             onDismiss = { insertSheet = false },
@@ -241,7 +257,7 @@ internal fun MarkdownEditor(
                 onInsertSheet = { insertSheet = true },
                 onToggleFind = {
                     findVisible = !findVisible
-                    if (findVisible) findFocus.requestFocus()
+
                 },
                 onSave = onSave,
                 onRequestSaveAs = onRequestSaveAs,

@@ -183,11 +183,11 @@ private class BidiAwareListItemSpanFactory : SpanFactory {
  *
  * Markwon 4.6.2 builds the default marker as an ASCII string. That works for
  * English but leaves Persian lists with Latin digits and punctuation on the
- * wrong visual side. This span determines the dominant strong direction of the
+ * wrong visual side. This span detects RTL characters in the
  * actual list-item text at draw time:
  *
- *  - Persian/Arabic-dominant item -> Persian digits and RTL punctuation
- *  - Latin-dominant item          -> Latin digits and normal LTR punctuation
+ *  - Persian/Arabic-containing item -> Persian digits and RTL punctuation
+ *  - LTR item          -> Latin digits and normal LTR punctuation
  *
  * The Markdown source itself is never rewritten.
  */
@@ -258,7 +258,6 @@ private fun isRtlDominantListItem(
     end: Int
 ): Boolean {
     var rtlScore = 0
-    var ltrScore = 0
     var index = start.coerceAtLeast(0)
     val limit = minOf(end.coerceAtMost(text.length), index + 768)
 
@@ -270,13 +269,12 @@ private fun isRtlDominantListItem(
             Character.DIRECTIONALITY_RIGHT_TO_LEFT,
             Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC -> rtlScore += 2
 
-            Character.DIRECTIONALITY_LEFT_TO_RIGHT -> ltrScore += 1
         }
 
         index += Character.charCount(codePoint)
     }
 
-    return rtlScore > 0 && rtlScore >= ltrScore
+    return rtlScore > 0
 }
 
 private fun Int.toPersianDigits(): String = buildString {
