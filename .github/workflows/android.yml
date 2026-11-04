@@ -105,7 +105,26 @@ jobs:
           echo "MARBLEMD_KEY_PASSWORD=$key_password" >> "$GITHUB_ENV"
 
       - name: Unit tests
-        run: gradle --no-daemon --stacktrace testDebugUnitTest
+        shell: bash
+        run: |
+          set +e
+          gradle --no-daemon --stacktrace testDebugUnitTest 2>&1 | tee "$RUNNER_TEMP/unit-tests.log"
+          rc=${PIPESTATUS[0]}
+          set -e
+          if (( rc != 0 )); then
+            python3 -c '
+          import glob, re, xml.etree.ElementTree as ET
+          lines = open("${{ runner.temp }}/unit-tests.log", errors="replace").read().splitlines()
+          relevant = [s for s in lines if re.search(r"(^e: |error:| FAILED|What went wrong|Execution failed|There were failing tests|Could not resolve|Could not find)", s, re.I)]
+          for path in glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml"):
+              root = ET.parse(path).getroot()
+              for failure in root.iter("failure"):
+                  relevant.append((failure.get("message") or "") + " " + (failure.text or "")[:600])
+          message = "\n".join(relevant[-30:]) or "\n".join(lines[-30:])
+          print("::error title=Unit tests failed::" + message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))
+          '
+          fi
+          exit "$rc"
 
       - name: Android Lint
         shell: bash

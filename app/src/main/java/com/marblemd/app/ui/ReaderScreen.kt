@@ -3,6 +3,8 @@ package com.marblemd.app.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,6 +56,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -67,6 +70,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -74,6 +78,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -82,6 +90,10 @@ import com.marblemd.app.library.MarkdownTemplate
 import com.marblemd.app.library.RecentDocument
 import com.marblemd.app.markdown.MarkdownPlanHeading
 import com.marblemd.app.markdown.MarkdownRenderPlan
+import com.marblemd.app.markdown.searchBlocks
+import com.marblemd.app.markdown.ReadingMatch
+import org.commonmark.node.FencedCodeBlock
+import org.commonmark.node.IndentedCodeBlock
 import com.marblemd.app.model.DirectionMode
 import com.marblemd.app.model.MarkdownDocument
 import com.marblemd.app.model.ReaderFont
@@ -91,6 +103,7 @@ import com.marblemd.app.text.CustomFont
 import com.marblemd.app.update.UpdateStatus
 import com.marblemd.app.update.UpdateUiState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -123,6 +136,7 @@ fun ReaderScreen(
     onContentChange: (String) -> Unit,
     onSaveNow: () -> Unit,
     onRequestSaveAs: () -> Unit,
+    onExportHtml: () -> Unit,
     onEditingChange: (Boolean) -> Unit,
     onFontSizeChange: (Float) -> Unit,
     onDirectionChange: (DirectionMode) -> Unit,
@@ -137,6 +151,7 @@ fun ReaderScreen(
     var librarySheet by remember { mutableStateOf(false) }
     var templateSheet by remember { mutableStateOf(false) }
     var outlineSheet by remember { mutableStateOf(false) }
+    var searchSheet by remember { mutableStateOf(false) }
     var readingSettingsSheet by remember { mutableStateOf(false) }
     var updateSheet by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
@@ -242,6 +257,17 @@ fun ReaderScreen(
             onSelect = { heading ->
                 outlineSheet = false
                 scope.launch { readerListState?.animateScrollToItem(heading.blockIndex) }
+            }
+        )
+    }
+
+    if (searchSheet && activePlan != null && !editing) {
+        ReadingSearchSheet(
+            plan = activePlan,
+            onDismiss = { searchSheet = false },
+            onSelect = { index ->
+                searchSheet = false
+                scope.launch { readerListState?.animateScrollToItem(index) }
             }
         )
     }
@@ -393,6 +419,19 @@ fun ReaderScreen(
                                 )
                             }
 
+                            if (activePlan != null && !editing) {
+                                DropdownMenuItem(
+                                    text = { Text("Search in preview") },
+                                    onClick = { moreMenu = false; searchSheet = true }
+                                )
+                            }
+                            if (activeDocument != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Export portable HTML") },
+                                    onClick = { moreMenu = false; onExportHtml() }
+                                )
+                            }
+
                             DropdownMenuItem(
                                 text = { Text("Reading settings") },
                                 leadingIcon = { Icon(Icons.Outlined.TextFields, contentDescription = null) },
@@ -454,6 +493,7 @@ fun ReaderScreen(
 
                 editing -> MarkdownEditor(
                     markdown = activeDocument.content,
+                    directionMode = directionMode,
                     onMarkdownChange = onContentChange,
                     scrollState = editorScroll ?: fallbackScrollState,
                     saveStateLabel = activeDocument.saveState.compactLabel(),
@@ -745,6 +785,7 @@ private fun ReadingSettingsSheet(
             }
 
             Text("Direction", style = MaterialTheme.typography.labelLarge)
+            Text("Auto detects RTL letters in each prose block. Code blocks stay left-to-right.", style = MaterialTheme.typography.labelSmall)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -789,15 +830,92 @@ private fun LazyMarkdownDocument(
             items = plan.blocks,
             key = { _, block -> block.index }
         ) { index, block ->
-            MarkdownText(
-                node = block.node,
-                fontSizeSp = fontSizeSp,
-                directionMode = directionMode,
-                engine = engine,
-                isFirstBlock = index == 0,
-                isLastBlock = index == plan.blocks.lastIndex,
-                modifier = Modifier.fillMaxWidth()
+            val node = block.node
+            if (node is FencedCodeBlock || node is IndentedCodeBlock) {
+                val code = if (node is FencedCodeBlock) node.literal else (node as IndentedCodeBlock).literal
+                val language = if (node is FencedCodeBlock) node.info.orEmpty().trim().substringBefore(' ') else ""
+                CodeBlock(code, language, index == plan.blocks.lastIndex)
+            } else {
+                MarkdownText(
+                    node = node,
+                    fontSizeSp = fontSizeSp,
+                    directionMode = directionMode,
+                    engine = engine,
+                    isFirstBlock = index == 0,
+                    isLastBlock = index == plan.blocks.lastIndex,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CodeBlock(code: String, language: String, isLast: Boolean) {
+    val clipboard = LocalClipboardManager.current
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = if (isLast) 64.dp else 8.dp),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(language.ifBlank { "Code" }, style = MaterialTheme.typography.labelMedium)
+                TextButton(onClick = { clipboard.setText(AnnotatedString(code)) }) { Text("Copy") }
+            }
+            SelectionContainer {
+                Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(12.dp)) {
+                    Text(
+                        text = code.trimEnd('\n'),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 14.sp,
+                            textDirection = TextDirection.Ltr
+                        ),
+                        softWrap = false
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReadingSearchSheet(plan: MarkdownRenderPlan, onDismiss: () -> Unit, onSelect: (Int) -> Unit) {
+    var query by remember(plan) { mutableStateOf("") }
+    val matches by produceState<List<ReadingMatch>>(emptyList(), plan, query) {
+        value = emptyList()
+        if (query.isNotBlank()) {
+            delay(200)
+            value = withContext(Dispatchers.Default) { searchBlocks(plan, query) }
+        }
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+            Text("Search in preview", style = MaterialTheme.typography.titleLarge)
+            OutlinedTextField(
+                value = query, onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                label = { Text("Find text") }, singleLine = true
             )
+            Text(
+                if (query.isBlank()) "Search rendered text and code" else "${matches.size} matching blocks",
+                style = MaterialTheme.typography.bodySmall
+            )
+            LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 32.dp)) {
+                items(matches, key = { it.blockIndex }) { match ->
+                    ListItem(
+                        headlineContent = { Text(match.excerpt, maxLines = 3, overflow = TextOverflow.Ellipsis) },
+                        supportingContent = { Text("Block ${match.blockIndex + 1}") },
+                        modifier = Modifier.clickable { onSelect(match.blockIndex) }
+                    )
+                }
+            }
         }
     }
 }

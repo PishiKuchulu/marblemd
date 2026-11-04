@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.core.content.IntentCompat
 import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
+import com.marblemd.app.markdown.HtmlExport
 import com.marblemd.app.library.DocumentMemory
 import com.marblemd.app.library.MarkdownTemplate
 import com.marblemd.app.library.RecentDocument
@@ -123,6 +124,32 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Capture the exact document and settings at launch, even if the user switches tabs.
+    private var pendingHtmlExport: Triple<String, String, DirectionMode>? = null
+    private val exportHtml = registerForActivityResult(ActivityResultContracts.CreateDocument("text/html")) { uri ->
+        val snapshot = pendingHtmlExport
+        pendingHtmlExport = null
+        if (uri != null && snapshot != null) {
+            lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val html = HtmlExport.render(snapshot.first, snapshot.second, snapshot.third)
+                        val stream = contentResolver.openOutputStream(uri, "wt")
+                            ?: error("Could not open export destination")
+                        stream.use { it.write(html.toByteArray(StandardCharsets.UTF_8)) }
+                    }
+                }
+                result.onSuccess { toast("HTML exported") }
+                    .onFailure { toast(it.message ?: "HTML export failed") }
+            }
+        }
+    }
+
+    private fun requestHtmlExport(document: MarkdownDocument) {
+        pendingHtmlExport = Triple(document.content, document.title, directionMode)
+        exportHtml.launch(document.title.substringBeforeLast('.', document.title) + ".html")
+    }
+
     private val importFont = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@registerForActivityResult
         lifecycleScope.launch {
@@ -186,6 +213,7 @@ class MainActivity : ComponentActivity() {
                     onContentChange = { content -> active?.let { updateContent(it.id, content) } },
                     onSaveNow = { active?.let { saveNow(it.id) } },
                     onRequestSaveAs = { active?.let { requestSaveAs(it.id) } },
+                    onExportHtml = { active?.let(::requestHtmlExport) },
                     onEditingChange = { editing ->
                         active?.let { document ->
                             editingIds = if (editing) {

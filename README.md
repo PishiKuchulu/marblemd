@@ -164,3 +164,21 @@ branding/                        # آیکون فروشگاه، بنر و لوگ�
 ## 📄 License
 
 MIT — فایل‌های فونت در زمان build از پروژه‌های OFL اصلی دانلود می‌شوند و در سورس نگه‌داری نمی‌شوند. فونت‌هایی که کاربر خودش اضافه می‌کند، فقط در حافظه‌ی خصوصی همان دستگاه می‌مانند.
+
+### Reading mixed-direction documents and code
+
+In **Reading settings → Direction**, Auto detects strong RTL letters in each
+prose block, even when English or numbers come first; RTL and LTR explicitly
+force prose direction. Standalone fenced and indented code blocks remain LTR,
+with a language label, horizontal scrolling, text selection and a Copy button.
+The source editor uses the selected direction; in Auto it aligns the source as
+RTL when the document contains RTL letters. Nested code blocks continue to use
+the normal Markdown renderer.
+
+The overflow menu also offers **Search in preview** (tap a matching block to
+jump to it) and **Export portable HTML**. The HTML file contains its styling and
+direction logic and can be opened without MarbleMD or an internet connection.
+Images and links keep their original URLs/paths and may need network access or
+accompanying files. For safety, raw HTML in Markdown is escaped and unsafe URLs
+are filtered; exported task-list syntax is shown as text rather than interactive
+checkboxes. Export is a snapshot and does not change the Markdown file.

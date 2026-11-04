@@ -25,6 +25,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.marblemd.app.markdown.MarkdownEngine
+import com.marblemd.app.markdown.blockText
+import com.marblemd.app.markdown.containsRtl
 import com.marblemd.app.model.DirectionMode
 import com.marblemd.app.model.ReaderFont
 import kotlinx.coroutines.Dispatchers
@@ -133,16 +135,16 @@ internal fun MarkdownText(
                 view.appliedRender = ready
             }
 
-            applyDirection(view, directionMode)
+            applyDirection(view, directionMode, containsRtl(blockText(node, includeCode = false)))
         }
     )
 }
 
-private fun applyDirection(view: TextView, directionMode: DirectionMode) {
+private fun applyDirection(view: TextView, directionMode: DirectionMode, autoRtl: Boolean) {
     when (directionMode) {
         DirectionMode.AUTO -> {
-            view.layoutDirection = View.LAYOUT_DIRECTION_LOCALE
-            view.textDirection = View.TEXT_DIRECTION_FIRST_STRONG
+            view.layoutDirection = if (autoRtl) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+            view.textDirection = if (autoRtl) View.TEXT_DIRECTION_RTL else View.TEXT_DIRECTION_LTR
             view.textAlignment = View.TEXT_ALIGNMENT_TEXT_START
         }
         DirectionMode.RTL -> {
