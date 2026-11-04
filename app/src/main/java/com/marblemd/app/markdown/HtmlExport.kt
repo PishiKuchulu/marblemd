@@ -3,16 +3,41 @@ package com.marblemd.app.markdown
 import com.marblemd.app.model.DirectionMode
 import org.commonmark.ext.gfm.strikethrough.StrikethroughExtension
 import org.commonmark.ext.gfm.tables.TablesExtension
+import org.commonmark.node.Image
+import org.commonmark.node.Link
+import org.commonmark.node.Node
 import org.commonmark.parser.Parser
+import java.net.URI
 import org.commonmark.renderer.html.HtmlRenderer
 
 /** Creates a portable document without executing raw HTML from an untrusted Markdown file. */
 internal object HtmlExport {
+    private fun sanitizeDestinations(node: Node) {
+        when (node) {
+            is Link -> if (!safeDestination(node.destination, image = false)) node.destination = ""
+            is Image -> if (!safeDestination(node.destination, image = true)) node.destination = ""
+        }
+        var child = node.firstChild
+        while (child != null) {
+            sanitizeDestinations(child)
+            child = child.next
+        }
+    }
+
+    private fun safeDestination(destination: String, image: Boolean): Boolean {
+        if (destination.any { it <= ' ' || it == '\\' }) return false
+        val uri = runCatching { URI(destination) }.getOrNull() ?: return false
+        val scheme = uri.scheme?.lowercase(java.util.Locale.ROOT) ?: return true
+        return scheme == "http" || scheme == "https" || (!image && scheme == "mailto")
+    }
+
     fun render(markdown: String, title: String, direction: DirectionMode): String {
         val extensions = listOf(TablesExtension.create(), StrikethroughExtension.create())
         val parser = Parser.builder().extensions(extensions).build()
-        val renderer = HtmlRenderer.builder().extensions(extensions).escapeHtml(true).sanitizeUrls(true).build()
-        val body = renderer.render(parser.parse(markdown))
+        val renderer = HtmlRenderer.builder().extensions(extensions).escapeHtml(true).build()
+        val document = parser.parse(markdown)
+        sanitizeDestinations(document)
+        val body = renderer.render(document)
         val escapedTitle = title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             .replace("\"", "&quot;").replace("'", "&#39;")
         val forced = when (direction) {
