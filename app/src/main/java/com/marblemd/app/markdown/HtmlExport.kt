@@ -29,7 +29,7 @@ pre{direction:ltr;text-align:left;overflow:auto;padding:1rem;background:#8882;bo
 // Decide per prose block, ignoring inline code. Code is always LTR.
 for (const el of document.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,td,th,blockquote')) {
   const clone = el.cloneNode(true); clone.querySelectorAll('code,pre').forEach(x => x.remove());
-  const rtl = /[\u0590-\u05ff\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff\ufb1d-\ufdff\ufe70-\ufeff]/u.test(clone.textContent);
+  const rtl = [...clone.textContent].some(c => /\p{Letter}/u.test(c) && /[\u0590-\u05ff\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff\ufb1d-\ufdff\ufe70-\ufeff]/u.test(c));
   el.dir = document.body.dataset.direction === 'auto' ? (rtl ? 'rtl' : 'ltr') : document.body.dataset.direction;
 }
 </script></body></html>"""

@@ -130,7 +130,7 @@ internal fun MarkdownEditor(
         fontSize = 16.sp,
         lineHeight = 25.sp,
         textDirection = when (directionMode) {
-            DirectionMode.AUTO -> if (containsRtl(markdown)) TextDirection.ContentOrRtl else TextDirection.ContentOrLtr
+            DirectionMode.AUTO -> if (containsRtl(markdown)) TextDirection.Rtl else TextDirection.Ltr
             DirectionMode.RTL -> TextDirection.Rtl
             DirectionMode.LTR -> TextDirection.Ltr
         },
