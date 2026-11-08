@@ -6,7 +6,7 @@
 
 **A native Android Markdown reader *and* editor built for multilingual, bidirectional text.**
 
-[![Android CI](https://github.com/marble098/marblemd/actions/workflows/android.yml/badge.svg)](https://github.com/marble098/marblemd/actions/workflows/android.yml)
+[![Android CI](https://github.com/PishiKuchulu/marblemd/actions/workflows/android.yml/badge.svg)](https://github.com/PishiKuchulu/marblemd/actions/workflows/android.yml)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-3DDC84?logo=android&logoColor=white)](https://developer.android.com/)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
@@ -15,6 +15,8 @@
 Persian · العربية · کوردی · اردو · English · Русский · Ελληνικά · 日本語 · 中文
 
 </div>
+
+> **Fork notice** — This repository is a fork of [marble098/marblemd](https://github.com/marble098/marblemd), maintained by [PishiKuchulu](https://github.com/PishiKuchulu). The original app is MIT-licensed and all credit for it goes to its author. This fork fixes verified data-loss bugs and adds features (see «تغییرات این فورک» below). Releases published here are built and signed by this fork, and this fork's in-app updater only ever installs APKs from this repository.
 
 ---
 
@@ -78,10 +80,23 @@ Persian · العربية · کوردی · اردو · English · Русский
 
 ## 🚀 نصب
 
-۱. از صفحه‌ی [Releases](https://github.com/marble098/marblemd/releases) آخرین APK را بگیر:
+۱. از صفحه‌ی [Releases](https://github.com/PishiKuchulu/marblemd/releases) آخرین APK را بگیر:
    - `MarbleMD-<version>-universal.apk` برای همه‌ی دستگاه‌ها
    - یا فایل مخصوص معماری خودت (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`) که حجم کمتری دارد.
 ۲. نصب کن و هر فایل `.md` را با MarbleMD باز کن (اپ به `ACTION_VIEW` و `ACTION_SEND` برای Markdown و متن ساده پاسخ می‌دهد).
+
+---
+
+## 🍴 تغییرات این فورک
+
+این فورک ابتدا باگ‌های تأییدشده‌ی نسخه‌ی اصلی را رفع کرد و بعد قابلیت‌های تازه گرفت:
+
+- **رفع دو باگ بحرانیِ از دست رفتن داده**: اسناد بزرگ‌تر از ۴۰۰ هزار کاراکتر دیگر هنگام بازگردانی نشست خالی نمی‌شوند و ویرایششان فایل اصلی را پاک نمی‌کند؛ Undo بعد از جابه‌جایی بین تب‌ها دیگر متن سند دیگر را روی فایل فعال نمی‌نویسد.
+- **نوشتن امن‌تر فایل‌ها**: سریال‌سازی همه‌ی نوشتن‌ها با Mutex و وریفای پس از نوشتن.
+- **امضای انتشار بدون اعتبار پیش‌فرض** و گیت‌های امنیتی برای نام asset آپدیت و نام واقعی فونت‌های واردشده.
+- **بخش تنظیمات**: تم روشن/تیره/سیستمی، کنترل به‌روزرسانی و درباره‌ی برنامه.
+- **به‌روزرسانی داخل برنامه از ریلیزهای همین فورک** (با همان زنجیره‌ی وریفای SHA-256 و یکسانی امضا) + امکان خاموش‌کردن بررسی خودکار.
+- **جستجوی کتابخانه** روی اسناد باز و اخیرها، **اطلاعات سند** (کلمه/کاراکتر/خط/زمان مطالعه) و **تغییرنام فونت‌های سفارشی**.
 
 ---
 

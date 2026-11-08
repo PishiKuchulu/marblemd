@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,6 +33,7 @@ import com.marblemd.app.model.MarkdownDocument
 import com.marblemd.app.model.ReaderFont
 import com.marblemd.app.model.SaveState
 import com.marblemd.app.model.ScrollTarget
+import com.marblemd.app.model.ThemeMode
 import com.marblemd.app.text.CustomFont
 import com.marblemd.app.text.CustomFontStore
 import com.marblemd.app.text.FontRegistry
@@ -59,6 +61,8 @@ class MainActivity : ComponentActivity() {
     private var pendingCloseId by mutableStateOf<String?>(null)
     private var fontSizeSp by mutableFloatStateOf(18f)
     private var directionMode by mutableStateOf(DirectionMode.AUTO)
+    private var themeMode by mutableStateOf(ThemeMode.SYSTEM)
+    private var autoUpdateEnabled by mutableStateOf(true)
     private var readerFont by mutableStateOf(ReaderFont.SMART)
     private var customFonts by mutableStateOf<List<CustomFont>>(emptyList())
     private var uiFontId by mutableStateOf<String?>(null)
@@ -176,6 +180,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         restoreReaderPreferences()
+        autoUpdateEnabled = updateManager.isAutoCheckEnabled()
         customFonts = fontStore.fonts()
         readerFont = ReaderFont.fromKey(
             readerPreferences.getString(PREF_READER_FONT, null),
@@ -187,7 +192,12 @@ class MainActivity : ComponentActivity() {
         restoreSession()
 
         setContent {
-            MarbleMDTheme(typography = uiTypography) {
+            val darkTheme = when (themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+            MarbleMDTheme(typography = uiTypography, darkTheme = darkTheme) {
                 val active = tabs.firstOrNull { it.id == activeTabId }
                 ReaderScreen(
                     documents = tabs,
@@ -202,6 +212,8 @@ class MainActivity : ComponentActivity() {
                     editorFontFamily = uiFontFamily,
                     scrollTarget = scrollTarget,
                     updateState = updateUiState,
+                    themeMode = themeMode,
+                    autoUpdateEnabled = autoUpdateEnabled,
                     onScrollTargetHandled = { scrollTarget = null },
                     onScrollPositionChange = ::onScrollPositionChanged,
                     onOpen = ::launchDocumentPicker,
@@ -235,6 +247,9 @@ class MainActivity : ComponentActivity() {
                     onImportFont = { importFont.launch(arrayOf("*/*")) },
                     onDeleteFont = ::deleteCustomFont,
                     onUseFontInUi = ::setUiFont,
+                    onThemeModeChange = ::changeThemeMode,
+                    onAutoUpdateChange = ::changeAutoUpdateEnabled,
+                    onRenameFont = ::renameCustomFont,
                     onCheckForUpdates = { checkForUpdates(force = true) },
                     onDownloadUpdate = { downloadAvailableUpdate() },
                     onInstallUpdate = { installDownloadedUpdate() }
@@ -649,6 +664,28 @@ class MainActivity : ComponentActivity() {
         directionMode = runCatching {
             DirectionMode.valueOf(readerPreferences.getString(PREF_DIRECTION, null).orEmpty())
         }.getOrDefault(DirectionMode.AUTO)
+        themeMode = runCatching {
+            ThemeMode.valueOf(readerPreferences.getString(PREF_THEME_MODE, null).orEmpty())
+        }.getOrDefault(ThemeMode.SYSTEM)
+    }
+
+    private fun changeThemeMode(value: ThemeMode) {
+        themeMode = value
+        readerPreferences.edit { putString(PREF_THEME_MODE, value.name) }
+    }
+
+    private fun changeAutoUpdateEnabled(value: Boolean) {
+        autoUpdateEnabled = value
+        updateManager.setAutoCheckEnabled(value)
+    }
+
+    private fun renameCustomFont(font: CustomFont, newName: String) {
+        val renamed = fontStore.rename(font, newName)
+        customFonts = fontStore.fonts()
+        if (readerFont.key == ReaderFont.CUSTOM_PREFIX + font.id) {
+            readerFont = ReaderFont.custom(renamed)
+        }
+        toast("Font renamed to «${renamed.displayName}»")
     }
 
     private fun setReaderFontSize(value: Float) {
@@ -852,5 +889,6 @@ class MainActivity : ComponentActivity() {
         private const val PREF_FONT_SIZE = "font_size"
         private const val PREF_DIRECTION = "direction"
         private const val PREF_READER_FONT = "reader_font"
+        private const val PREF_THEME_MODE = "theme_mode"
     }
 }

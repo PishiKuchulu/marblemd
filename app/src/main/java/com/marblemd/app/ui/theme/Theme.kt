@@ -55,10 +55,11 @@ internal fun Typography.withFontFamily(fontFamily: FontFamily): Typography = cop
 @Composable
 fun MarbleMDTheme(
     typography: Typography? = null,
+    darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) Dark else Light,
+        colorScheme = if (darkTheme) Dark else Light,
         typography = typography ?: Typography(),
         content = content
     )
