@@ -247,8 +247,8 @@ class MainActivity : ComponentActivity() {
                     onImportFont = { importFont.launch(arrayOf("*/*")) },
                     onDeleteFont = ::deleteCustomFont,
                     onUseFontInUi = ::setUiFont,
-                    onThemeModeChange = ::setThemeMode,
-                    onAutoUpdateChange = ::setAutoUpdateEnabled,
+                    onThemeModeChange = ::changeThemeMode,
+                    onAutoUpdateChange = ::changeAutoUpdateEnabled,
                     onRenameFont = ::renameCustomFont,
                     onCheckForUpdates = { checkForUpdates(force = true) },
                     onDownloadUpdate = { downloadAvailableUpdate() },
@@ -669,12 +669,12 @@ class MainActivity : ComponentActivity() {
         }.getOrDefault(ThemeMode.SYSTEM)
     }
 
-    private fun setThemeMode(value: ThemeMode) {
+    private fun changeThemeMode(value: ThemeMode) {
         themeMode = value
         readerPreferences.edit { putString(PREF_THEME_MODE, value.name) }
     }
 
-    private fun setAutoUpdateEnabled(value: Boolean) {
+    private fun changeAutoUpdateEnabled(value: Boolean) {
         autoUpdateEnabled = value
         updateManager.setAutoCheckEnabled(value)
     }
