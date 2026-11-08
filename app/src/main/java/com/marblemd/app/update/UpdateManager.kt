@@ -66,7 +66,16 @@ class UpdateManager(private val context: Context) {
     private val preferences =
         context.getSharedPreferences("marblemd_updates", Context.MODE_PRIVATE)
 
+    /** Automatic checks are on by default; the user can turn them off in Settings. */
+    fun isAutoCheckEnabled(): Boolean =
+        preferences.getBoolean(KEY_AUTO_CHECK_ENABLED, true)
+
+    fun setAutoCheckEnabled(enabled: Boolean) {
+        preferences.edit { putBoolean(KEY_AUTO_CHECK_ENABLED, enabled) }
+    }
+
     fun shouldAutoCheck(): Boolean {
+        if (!isAutoCheckEnabled()) return false
         val last = preferences.getLong(KEY_LAST_SUCCESSFUL_CHECK, 0L)
         return System.currentTimeMillis() - last >= AUTO_CHECK_INTERVAL_MS
     }
@@ -299,9 +308,13 @@ class UpdateManager(private val context: Context) {
     }
 
     companion object {
+        // This fork publishes its own signed releases; the in-app updater must
+        // follow the fork, not upstream (whose APKs the same-signer check in
+        // verifyApk would refuse anyway).
         private const val UPDATE_MANIFEST_URL =
-            "https://github.com/marble098/marblemd/releases/latest/download/update.json"
+            "https://github.com/PishiKuchulu/marblemd/releases/latest/download/update.json"
         private const val KEY_LAST_SUCCESSFUL_CHECK = "last_successful_check"
+        private const val KEY_AUTO_CHECK_ENABLED = "auto_check_enabled"
         private const val AUTO_CHECK_INTERVAL_MS = 6L * 60L * 60L * 1000L
         private const val CONNECT_TIMEOUT_MS = 15_000
         private const val READ_TIMEOUT_MS = 45_000

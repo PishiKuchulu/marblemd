@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -27,14 +28,21 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.marblemd.app.library.LibraryHitKind
+import com.marblemd.app.library.LibrarySearch
 import com.marblemd.app.library.MarkdownTemplate
 import com.marblemd.app.library.RecentDocument
 import com.marblemd.app.model.MarkdownDocument
@@ -60,6 +68,22 @@ internal fun LibrarySheet(
     onRemoveRecent: (RecentDocument) -> Unit,
     onClearRecents: () -> Unit
 ) {
+    var query by remember { mutableStateOf("") }
+    val hits = remember(query, documents, recents) {
+        LibrarySearch.search(
+            query = query,
+            openDocuments = documents.map { document ->
+                LibrarySearch.OpenDocument(
+                    id = document.id,
+                    title = document.title,
+                    uri = document.uri?.toString(),
+                    content = document.content
+                )
+            },
+            recents = recents
+        )
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
@@ -72,6 +96,17 @@ internal fun LibrarySheet(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
+            )
+
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("Search the library") },
+                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 6.dp)
             )
 
             Row(
@@ -91,7 +126,67 @@ internal fun LibrarySheet(
             }
 
             LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
-                if (documents.isNotEmpty()) {
+                if (query.isNotBlank()) {
+                    item { SectionHeader("Search results", "${hits.size}") }
+                    if (hits.isEmpty()) {
+                        item {
+                            Text(
+                                text = "No matches for «${query.trim()}».",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+                            )
+                        }
+                    }
+                    items(
+                        hits,
+                        key = { hit -> hit.kind.name + (hit.documentId ?: hit.recentUri ?: "") }
+                    ) { hit ->
+                        ListItem(
+                            modifier = Modifier.clickable {
+                                val docId = hit.documentId
+                                val recent = hit.recentUri?.let { uri ->
+                                    recents.firstOrNull { it.uri == uri }
+                                }
+                                when {
+                                    docId != null -> onSelectDocument(docId)
+                                    recent != null -> onOpenRecent(recent)
+                                }
+                            },
+                            leadingContent = {
+                                Icon(
+                                    if (hit.kind == LibraryHitKind.OPEN_TITLE ||
+                                        hit.kind == LibraryHitKind.OPEN_CONTENT
+                                    ) {
+                                        Icons.Outlined.Description
+                                    } else {
+                                        Icons.Outlined.History
+                                    },
+                                    contentDescription = null
+                                )
+                            },
+                            headlineContent = {
+                                Text(
+                                    hit.title,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            supportingContent = {
+                                if (hit.excerpt.isNotBlank()) {
+                                    Text(
+                                        hit.excerpt,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        )
+                    }
+                }
+
+                if (query.isBlank() && documents.isNotEmpty()) {
                     item { SectionHeader("Open tabs", "${documents.size}") }
                     items(documents, key = { it.id }) { document ->
                         ListItem(
@@ -120,7 +215,7 @@ internal fun LibrarySheet(
                     }
                 }
 
-                if (recents.isNotEmpty()) {
+                if (query.isBlank() && recents.isNotEmpty()) {
                     item {
                         HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
                         Row(
@@ -143,7 +238,7 @@ internal fun LibrarySheet(
                     }
                 }
 
-                if (documents.isEmpty() && recents.isEmpty()) {
+                if (query.isBlank() && documents.isEmpty() && recents.isEmpty()) {
                     item {
                         Text(
                             text = "Nothing here yet. Open a .md file or start a new one.",

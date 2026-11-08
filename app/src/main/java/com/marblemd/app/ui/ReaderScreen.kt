@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.FormatListBulleted
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Settings
@@ -89,6 +90,7 @@ import androidx.compose.ui.unit.dp
 import com.marblemd.app.R
 import com.marblemd.app.library.MarkdownTemplate
 import com.marblemd.app.library.RecentDocument
+import com.marblemd.app.markdown.DocumentStats
 import com.marblemd.app.markdown.MarkdownPlanHeading
 import com.marblemd.app.markdown.MarkdownRenderPlan
 import com.marblemd.app.markdown.searchBlocks
@@ -100,6 +102,7 @@ import com.marblemd.app.model.MarkdownDocument
 import com.marblemd.app.model.ReaderFont
 import com.marblemd.app.model.SaveState
 import com.marblemd.app.model.ScrollTarget
+import com.marblemd.app.model.ThemeMode
 import com.marblemd.app.text.CustomFont
 import com.marblemd.app.update.UpdateStatus
 import com.marblemd.app.update.UpdateUiState
@@ -125,6 +128,8 @@ fun ReaderScreen(
     editorFontFamily: FontFamily?,
     scrollTarget: ScrollTarget?,
     updateState: UpdateUiState,
+    themeMode: ThemeMode,
+    autoUpdateEnabled: Boolean,
     onScrollTargetHandled: () -> Unit,
     onScrollPositionChange: (String, Int) -> Unit,
     onOpen: () -> Unit,
@@ -145,6 +150,9 @@ fun ReaderScreen(
     onImportFont: () -> Unit,
     onDeleteFont: (CustomFont) -> Unit,
     onUseFontInUi: (CustomFont?) -> Unit,
+    onThemeModeChange: (ThemeMode) -> Unit,
+    onAutoUpdateChange: (Boolean) -> Unit,
+    onRenameFont: (CustomFont, String) -> Unit,
     onCheckForUpdates: () -> Unit,
     onDownloadUpdate: () -> Unit,
     onInstallUpdate: () -> Unit
@@ -155,8 +163,11 @@ fun ReaderScreen(
     var searchSheet by remember { mutableStateOf(false) }
     var readingSettingsSheet by remember { mutableStateOf(false) }
     var updateSheet by remember { mutableStateOf(false) }
+    var settingsSheet by remember { mutableStateOf(false) }
+    var documentInfoVisible by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
     var fontPendingDelete by remember { mutableStateOf<CustomFont?>(null) }
+    var fontPendingRename by remember { mutableStateOf<CustomFont?>(null) }
 
     val renderPlans = remember { mutableStateMapOf<String, MarkdownRenderPlan>() }
     val readerListStates = remember { mutableMapOf<String, LazyListState>() }
@@ -286,7 +297,86 @@ fun ReaderScreen(
             onDirectionChange = onDirectionChange,
             onImportFont = onImportFont,
             onDeleteFont = { font -> fontPendingDelete = font },
+            onRenameFont = { font -> fontPendingRename = font },
             onUseFontInUi = onUseFontInUi
+        )
+    }
+
+    if (settingsSheet) {
+        SettingsSheet(
+            themeMode = themeMode,
+            autoUpdateEnabled = autoUpdateEnabled,
+            updateState = updateState,
+            onDismiss = { settingsSheet = false },
+            onThemeModeChange = onThemeModeChange,
+            onAutoUpdateChange = onAutoUpdateChange,
+            onOpenReadingSettings = {
+                settingsSheet = false
+                readingSettingsSheet = true
+            },
+            onOpenUpdates = {
+                settingsSheet = false
+                updateSheet = true
+                onCheckForUpdates()
+            }
+        )
+    }
+
+    fontPendingRename?.let { font ->
+        var renameText by remember(font.id) { mutableStateOf(font.displayName) }
+        AlertDialog(
+            onDismissRequest = { fontPendingRename = null },
+            title = { Text("Rename font") },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    singleLine = true,
+                    label = { Text("Font name") }
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        fontPendingRename = null
+                        onRenameFont(font, renameText)
+                    }
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { fontPendingRename = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (documentInfoVisible && activeDocument != null) {
+        val stats = remember(activeDocument.id, activeDocument.revision) {
+            DocumentStats.of(activeDocument.content)
+        }
+        AlertDialog(
+            onDismissRequest = { documentInfoVisible = false },
+            title = { Text("Document info") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        activeDocument.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    StatRow("Words", stats.words.toString())
+                    StatRow("Characters", stats.characters.toString())
+                    StatRow("Lines", stats.lines.toString())
+                    StatRow("Headings", stats.headings.toString())
+                    StatRow(
+                        "Reading time",
+                        if (stats.words == 0) "—" else "~${stats.readingMinutes} min"
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { documentInfoVisible = false }) { Text("Done") }
+            }
         )
     }
 
@@ -433,12 +523,36 @@ fun ReaderScreen(
                                 )
                             }
 
+                            if (activeDocument != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Document info") },
+                                    leadingIcon = {
+                                        Icon(Icons.Outlined.Info, contentDescription = null)
+                                    },
+                                    onClick = {
+                                        moreMenu = false
+                                        documentInfoVisible = true
+                                    }
+                                )
+                            }
+
                             DropdownMenuItem(
                                 text = { Text("Reading settings") },
                                 leadingIcon = { Icon(Icons.Outlined.TextFields, contentDescription = null) },
                                 onClick = {
                                     moreMenu = false
                                     readingSettingsSheet = true
+                                }
+                            )
+
+                            DropdownMenuItem(
+                                text = { Text("Settings") },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.Settings, contentDescription = null)
+                                },
+                                onClick = {
+                                    moreMenu = false
+                                    settingsSheet = true
                                 }
                             )
 
@@ -663,6 +777,7 @@ private fun ReadingSettingsSheet(
     onDirectionChange: (DirectionMode) -> Unit,
     onImportFont: () -> Unit,
     onDeleteFont: (CustomFont) -> Unit,
+    onRenameFont: (CustomFont) -> Unit,
     onUseFontInUi: (CustomFont?) -> Unit
 ) {
     var pendingSize by remember(fontSizeSp) { mutableFloatStateOf(fontSizeSp) }
@@ -789,6 +904,12 @@ private fun ReadingSettingsSheet(
                                 onUseFontInUi(if (checked) custom else null)
                             }
                         )
+                    }
+                    OutlinedButton(
+                        onClick = { onRenameFont(custom) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Rename «${custom.displayName}»")
                     }
                 }
             }
@@ -1076,6 +1197,17 @@ private fun UpdateSheet(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun StatRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value)
     }
 }
 
