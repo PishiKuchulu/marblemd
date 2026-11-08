@@ -92,13 +92,20 @@ jobs:
             [[ -n "$KEY_ALIAS" ]] || { echo "::error::Missing MARBLEMD_RELEASE_KEY_ALIAS"; exit 1; }
             [[ -n "$KEY_PASSWORD" ]] || { echo "::error::Missing MARBLEMD_RELEASE_KEY_PASSWORD"; exit 1; }
 
-            printf '%s' "$KEYSTORE_B64" | base64 --decode > "$keystore"
+            echo "DIAG len-b64=${#KEYSTORE_B64} len-storepw=${#STORE_PASSWORD} len-keypw=${#KEY_PASSWORD} len-alias=${#KEY_ALIAS} alias=[$KEY_ALIAS]"
+            echo "DIAG b64-sha256=$(printf '%s' "$KEYSTORE_B64" | sha256sum | cut -d' ' -f1)"
+            printf '%s' "$KEYSTORE_B64" | base64 --decode > "$keystore" || echo "DIAG decode-rc=$?"
+            echo "DIAG decoded-size=$(stat -c%s "$keystore") decoded-sha256=$(sha256sum "$keystore" | cut -d' ' -f1)"
+            keytool -list -keystore "$keystore" -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" || echo "DIAG keytool-alias-rc=$?"
+            keytool -list -keystore "$keystore" -storepass "$STORE_PASSWORD" || echo "DIAG keytool-listall-rc=$?"
             store_password="$STORE_PASSWORD"
             key_alias="$KEY_ALIAS"
             key_password="$KEY_PASSWORD"
           fi
 
-          keytool -list -keystore "$keystore" -storepass "$store_password" -alias "$key_alias" >/dev/null
+          echo "DIAG final-verify-start"
+          keytool -list -keystore "$keystore" -storepass "$store_password" -alias "$key_alias" || echo "DIAG final-verify-rc=$?"
+          echo "DIAG signing-prep-reached-end"
           echo "MARBLEMD_KEYSTORE=$keystore" >> "$GITHUB_ENV"
           echo "MARBLEMD_STORE_PASSWORD=$store_password" >> "$GITHUB_ENV"
           echo "MARBLEMD_KEY_ALIAS=$key_alias" >> "$GITHUB_ENV"
