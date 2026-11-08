@@ -55,6 +55,17 @@ class TrueTypeNameTest {
     }
 
     @Test
+    fun truncatedFontHasSignatureButNoFamilyName() {
+        // The premise of the AUD-011 import gate: a file cut down to its
+        // first bytes still passes the signature check, but no `name` table
+        // can be read from it, so the importer must reject it.
+        val truncated = ByteArray(100)
+        truncated[1] = 1 // SFNT signature 0x00010000, zero tables
+        assertTrue(TrueTypeName.looksLikeFont(truncated))
+        assertNull(TrueTypeName.familyName(truncated))
+    }
+
+    @Test
     fun malformedNameTableDoesNotCrash() {
         val font = buildFont(
             listOf(NameRecord(3, 1, nameId = 1, value = "Broken")),

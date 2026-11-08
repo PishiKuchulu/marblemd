@@ -119,8 +119,15 @@ class UpdateManager(private val context: Context) {
     ): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
             val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-            val finalFile = File(dir, info.asset.name)
-            val partFile = File(dir, "${info.asset.name}.part")
+            // The asset name comes from a remote manifest: never let it act
+            // as a path. Only a bare `.apk` file name may land in the update
+            // cache (AUD-010).
+            val safeName = File(info.asset.name).name
+            require(safeName == info.asset.name && safeName.endsWith(".apk", ignoreCase = true)) {
+                "Unexpected update asset name"
+            }
+            val finalFile = File(dir, safeName)
+            val partFile = File(dir, "$safeName.part")
             if (partFile.exists()) partFile.delete()
 
             val connection = openConnection(info.asset.url)
