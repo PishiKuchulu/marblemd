@@ -10,6 +10,13 @@ val marbleVersionCode =
 val marbleVersionName =
     providers.environmentVariable("MARBLEMD_VERSION_NAME").orNull ?: "1.0.0"
 
+// No default signing credentials (AUD-009): when a keystore is provided,
+// every signing input must be provided with it, or the build fails with a
+// clear message instead of silently using a known credential.
+fun requiredSigningEnv(name: String): String =
+    System.getenv(name)?.takeIf { it.isNotBlank() }
+        ?: error("$name must be set when MARBLEMD_KEYSTORE is set")
+
 android {
     namespace = "com.marblemd.app"
     compileSdk = 37
@@ -29,9 +36,9 @@ android {
     val ciReleaseSigning = if (!ciKeystorePath.isNullOrBlank()) {
         signingConfigs.create("ciRelease") {
             storeFile = file(ciKeystorePath)
-            storePassword = System.getenv("MARBLEMD_STORE_PASSWORD") ?: "marblemd-ci"
-            keyAlias = System.getenv("MARBLEMD_KEY_ALIAS") ?: "marblemd"
-            keyPassword = System.getenv("MARBLEMD_KEY_PASSWORD") ?: "marblemd-ci"
+            storePassword = requiredSigningEnv("MARBLEMD_STORE_PASSWORD")
+            keyAlias = requiredSigningEnv("MARBLEMD_KEY_ALIAS")
+            keyPassword = requiredSigningEnv("MARBLEMD_KEY_PASSWORD")
         }
     } else null
 

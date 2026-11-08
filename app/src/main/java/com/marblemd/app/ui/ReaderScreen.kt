@@ -67,6 +67,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -491,19 +492,27 @@ fun ReaderScreen(
                     onOpenRecent = onOpenRecent
                 )
 
-                editing -> MarkdownEditor(
-                    markdown = activeDocument.content,
-                    directionMode = directionMode,
-                    onMarkdownChange = onContentChange,
-                    scrollState = editorScroll ?: fallbackScrollState,
-                    saveStateLabel = activeDocument.saveState.compactLabel(),
-                    canSaveAs = activeDocument.uri == null || !activeDocument.writable,
-                    onSave = onSaveNow,
-                    onRequestSaveAs = onRequestSaveAs,
-                    onExitToPreview = { onEditingChange(false) },
-                    fontFamily = editorFontFamily,
-                    modifier = Modifier.fillMaxSize()
-                )
+                // Keyed by document id: the editor's buffer and undo/redo
+                // history are `remember` state, so without a key they survive
+                // a tab switch and Undo can restore the *other* document's
+                // text into the active file, which autosave then persists
+                // (AUD-002). A fresh editor per document makes that
+                // cross-document leak impossible.
+                editing -> key(activeDocument.id) {
+                    MarkdownEditor(
+                        markdown = activeDocument.content,
+                        directionMode = directionMode,
+                        onMarkdownChange = onContentChange,
+                        scrollState = editorScroll ?: fallbackScrollState,
+                        saveStateLabel = activeDocument.saveState.compactLabel(),
+                        canSaveAs = activeDocument.uri == null || !activeDocument.writable,
+                        onSave = onSaveNow,
+                        onRequestSaveAs = onRequestSaveAs,
+                        onExitToPreview = { onEditingChange(false) },
+                        fontFamily = editorFontFamily,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
 
                 activePlan == null -> PreparingDocument(
                     title = activeDocument.title,

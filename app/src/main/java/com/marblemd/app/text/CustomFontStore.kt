@@ -72,6 +72,17 @@ class CustomFontStore(private val context: Context) {
         if (!TrueTypeName.looksLikeFont(bytes)) {
             error("That file is not a TrueType/OpenType font (.ttf or .otf)")
         }
+        // The signature alone proves almost nothing: a truncated download
+        // keeps its first bytes and used to be accepted, registered, and then
+        // silently ignored at render time (AUD-011). Require a readable
+        // `name` table too, except for TrueType Collections, whose names are
+        // taken from the file name by design.
+        val isCollection = bytes.size >= 4 &&
+            bytes[0] == 't'.code.toByte() && bytes[1] == 't'.code.toByte() &&
+            bytes[2] == 'c'.code.toByte() && bytes[3] == 'f'.code.toByte()
+        if (!isCollection && TrueTypeName.familyName(bytes) == null) {
+            error("That font file looks damaged or incomplete")
+        }
 
         val displayName = TrueTypeName.familyName(bytes)
             ?: fallbackName?.substringBeforeLast('.')?.takeIf { it.isNotBlank() }

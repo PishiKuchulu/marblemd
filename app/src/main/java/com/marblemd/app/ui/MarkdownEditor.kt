@@ -143,6 +143,12 @@ internal fun MarkdownEditor(
 
     LaunchedEffect(markdown) {
         if (markdown != value.text) {
+            // Text replaced from outside this editor (a reload, a restore, or
+            // — before the editor was keyed by document — a tab switch): the
+            // undo history describes a buffer that no longer exists, so it
+            // must never be replayed into the new text (AUD-002 defence in
+            // depth; the primary fix is `key(document.id)` at the call site).
+            history.clear()
             val cursor = value.selection.end.coerceIn(0, markdown.length)
             value = TextFieldValue(markdown, TextRange(cursor))
             layout = null

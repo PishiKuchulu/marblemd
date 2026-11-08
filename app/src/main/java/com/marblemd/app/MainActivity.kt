@@ -47,6 +47,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.nio.charset.StandardCharsets
 
@@ -74,6 +76,10 @@ class MainActivity : ComponentActivity() {
     private val scrollPositions = mutableMapOf<String, Int>()
     private val saveJobs = mutableMapOf<String, Job>()
     private val positionJobs = mutableMapOf<String, Job>()
+
+    // Serialises every document write (autosave, manual save, close-tab
+    // flush) so two writers can never interleave on the same file (AUD-003).
+    private val writeMutex = Mutex()
     private var saveAsTargetId: String? = null
     private var pendingRecentScroll = 0
     private val updateManager by lazy { UpdateManager(this) }
@@ -481,7 +487,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun writeDocument(document: MarkdownDocument): Boolean {
+    private suspend fun writeDocument(document: MarkdownDocument): Boolean =
+        writeMutex.withLock { writeDocumentUnlocked(document) }
+
+    private fun writeDocumentUnlocked(document: MarkdownDocument): Boolean {
         val uri = document.uri ?: return false
         return runCatching {
             val output = runCatching {
@@ -491,7 +500,16 @@ class MainActivity : ComponentActivity() {
             output.bufferedWriter(StandardCharsets.UTF_8).use { writer ->
                 writer.write(document.content)
             }
-            true
+            // Read-back verification (AUD-003): a truncating SAF write that
+            // was interrupted mid-stream must surface as a save failure, not
+            // as "Saved". When the provider grants no read access the write
+            // result stands on its own.
+            val readBack = runCatching {
+                contentResolver.openInputStream(uri)?.use { input ->
+                    input.bufferedReader(StandardCharsets.UTF_8).readText()
+                }
+            }.getOrNull()
+            readBack == null || readBack == document.content
         }.getOrDefault(false)
     }
 
