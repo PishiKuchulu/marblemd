@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -251,7 +252,13 @@ internal fun MarkdownEditor(
     }
 
     Surface(modifier = modifier) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        // imePadding: without it the edge-to-edge editor keeps the full
+        // screen height when the keyboard opens, so the keyboard covers
+        // the bottom of the text and the line being typed at the end of
+        // the document is hidden underneath it. Padding by the IME inset
+        // shrinks the scroll viewport to end above the keyboard, which
+        // also lets the text field scroll the cursor line into view.
+        Column(modifier = Modifier.fillMaxSize().imePadding()) {
             EditorToolbar(
                 canUndo = history.canUndo,
                 canRedo = history.canRedo,
